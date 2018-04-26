@@ -93,15 +93,8 @@
   <%= javascript_include_tag "shadowbox-i18n" %>
   <%= javascript_include_tag "shadowbox-infowindow" %>
 
-  <!-- Recaptcha -->
-  <script type="text/javascript" src="<%= request.protocol%>www.google.com/recaptcha/api/js/recaptcha_ajax.js"></script>
-
   <!-- Helper JS functions -->
   <script type="text/javascript">
-    // Show recaptcha
-    function show_recaptcha(element) {
-      Recaptcha.create("6LcqFtwSAAAAAJ5DbZf652BwgOjHra7aRuMDC3lq", element, {theme: "white"});
-    }
     // Resize below-header content on window resize
     function resize_content() {
       var siteHeaderHeight = document.getElementById('menubar').offsetHeight + document.getElementById('logobar').offsetHeight;
@@ -171,9 +164,9 @@
       <option value="fr" <%= (I18n.locale == :fr) ? "selected" : "" %>>Français</option>
       <option value="it" <%= (I18n.locale == :it) ? "selected" : "" %>>Italiano</option>
       <!-- <option value="he" <%= (I18n.locale == :he) ? "selected" : "" %>>עברית</option> -->
-      <option value="nl" <%= (I18n.locale == :"nl") ? "selected" : "" %>>Nederlands</option>
+      <option value="nl" <%= (I18n.locale == :nl) ? "selected" : "" %>>Nederlands</option>
       <option value="pl" <%= (I18n.locale == :pl) ? "selected" : "" %>>Polski</option>
-      <option value="pt-br" <%= (I18n.locale == :"pt-br") ? "selected" : "" %>>Português</option>
+      <option value="pt-br" <%= (I18n.locale == :"pt-BR") ? "selected" : "" %>>Português</option>
     </select>
   </div>
 
@@ -207,7 +200,7 @@
   <div style="display:none;"><a href="https://plus.google.com/114324461382595896953" rel="publisher">Google+</a></div>
 
  <!-- Title -->
- <a id="falling_fruit" href="/">falling fruit</a>
+ <%= link_to("falling fruit", root_path, id: "falling_fruit") %>
  <span id="subtitle">
  &ndash;
  <% if @freegan %>

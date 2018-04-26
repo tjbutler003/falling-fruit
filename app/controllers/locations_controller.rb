@@ -20,10 +20,10 @@ class LocationsController < ApplicationController
     bound = [params[:nelat],params[:nelng],params[:swlat],params[:swlng]].any? { |e| e.nil? } ? "" :
       "ST_INTERSECTS(location,ST_SETSRID(ST_MakeBox2D(ST_POINT(#{params[:swlng]},#{params[:swlat]}),
                                                      ST_POINT(#{params[:nelng]},#{params[:nelat]})),4326))"
-    i18n_name_field = I18n.locale != :en ? "types.#{I18n.locale.to_s.tr("-","_")}_name," : ""
+    i18n_name_field = "#{I18n.locale.to_s.tr("-","_")}_name"
     @locations = Location.joins("INNER JOIN types ON types.id=ANY(locations.type_ids)").
              joins("LEFT OUTER JOIN imports ON locations.import_id=imports.id").
-             select("ARRAY_AGG(COALESCE(#{i18n_name_field}types.name)) as name, locations.id as id,
+             select("ARRAY_AGG(COALESCE(#{i18n_name_field}, en_name)) as name, locations.id as id,
                      description, lat, lng, address, season_start, season_stop, no_season, access, unverified,
                      author, import_id, locations.created_at, locations.updated_at, locations.muni").
              where([bound,mfilter,"(types.category_mask & #{cat_mask})>0"].compact.join(" AND ")).
@@ -217,14 +217,16 @@ class LocationsController < ApplicationController
     @location = Location.new(params[:location])
     @location.type_ids = normalize_create_types(params)
     @location.user = current_user if user_signed_in?
-    @location.author = current_user.name unless (not user_signed_in?) or (current_user.add_anonymously)
+    unless params[:location].key?(:author)
+      @location.author = current_user.name unless (not user_signed_in?) or (current_user.add_anonymously)
+    end
     @observation = prepare_observation(obs_params, @location)
     @observation.author = @location.author unless @observation.nil?
 
     log_api_request("api/locations/create", 1)
     respond_to do |format|
       # FIXME: recaptcha check should go right at the beginning (before doing anything else)
-      test = user_signed_in? ? true : verify_recaptcha(:model => @location, :message => "ReCAPCHA error!")
+      test = user_signed_in? ? true : verify_recaptcha(:model => @location)
       if test and @location.save and (@observation.nil? or @observation.save)
         cluster_increment(@location)
         log_changes(@location, "added")
@@ -287,8 +289,7 @@ class LocationsController < ApplicationController
     log_api_request("api/locations/update",1)
     respond_to do |format|
       # FIXME: recaptcha check should go right at the beginning (before doing anything else)
-      test = user_signed_in? ? true : verify_recaptcha(:model => @location,
-                                                       :message => "ReCAPCHA error!")
+      test = user_signed_in? ? true : verify_recaptcha(:model => @location)
       if test and @location.update_attributes(params[:location]) and (@observation.nil? or @observation.save)
         log_changes(@location,"edited",nil,params[:author],patch,former_type_ids,former_location)
         cluster_increment(@location)
@@ -401,12 +402,10 @@ class LocationsController < ApplicationController
   def normalize_create_types(params)
     type_ids = []
 
-    params[:types].split(/\s*,\s*/).uniq.each{ |type_name|
-      full_name = ActionController::Base.helpers.sanitize(type_name)
+    params[:types].split(/\s*,\s*/).uniq.each{ |full_name|
       names = Type.parse_full_name(full_name)
-      types = Type.where(
-        "COALESCE(#{names[:common_fields].join(", ")})" + (names[:common_name].nil? ? " IS NULL" : " = '#{names[:common_name]}'"),
-        scientific_name: names[:scientific_name]
+      types = Type.where(scientific_name: names[:scientific_name]).where(
+        "COALESCE(#{names[:common_fields].join(", ")})" + (names[:common_name].nil? ? " IS NULL" : " = #{Type.sanitize(names[:common_name])}")
       )
       # If no matches found, add as pending type
       if types.nil? or types.empty?
